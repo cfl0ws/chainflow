@@ -9,6 +9,8 @@ Group=prometheus
 Type=simple
 ExecStart=/usr/local/bin/stargazer_exporter \
   --block-address=<change to your hash address> 
+Restart=on-failure
+RestartSec=20s
 
 [Install]
 WantedBy=multi-user.target

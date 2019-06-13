@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"reflect"
 	"strconv"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -15,12 +16,14 @@ import (
 var (
 	_ prometheus.Collector = &collector{}
 
+	oldStats     []stargazer.MissesBlock
 	blockAddress = kingpin.Flag("block-address", "Hash address of the block that needs to monitor").Required().String()
 	bindPort     = kingpin.Flag("bind-port", "Port which listens for promethius to scrape").Default(":9119").String()
 )
 
 type collector struct {
 	MissedBlocksTotal *prometheus.Desc
+	NewMissesBlocks   *prometheus.Desc
 	stats             func() ([]stargazer.MissesBlock, error)
 }
 
@@ -32,6 +35,12 @@ func newCollector(stats func() ([]stargazer.MissesBlock, error)) prometheus.Coll
 			[]string{"FirstBlock", "LastBlock"},
 			nil,
 		),
+		NewMissesBlocks: prometheus.NewDesc(
+			"new_missed_blocks",
+			"If there are new missed blocks this will return true, compaired to previous scrape",
+			nil,
+			nil,
+		),
 
 		stats: stats,
 	}
@@ -40,6 +49,7 @@ func newCollector(stats func() ([]stargazer.MissesBlock, error)) prometheus.Coll
 func (c *collector) Describe(ch chan<- *prometheus.Desc) {
 	ds := []*prometheus.Desc{
 		c.MissedBlocksTotal,
+		c.NewMissesBlocks,
 	}
 
 	for _, d := range ds {
@@ -67,6 +77,20 @@ func (c *collector) Collect(ch chan<- prometheus.Metric) {
 			LastBlock,
 		)
 	}
+
+	if oldStats != nil {
+		metricValue := 1.0
+		if reflect.DeepEqual(oldStats, stats) {
+			metricValue = 0.0
+		}
+
+		ch <- prometheus.MustNewConstMetric(
+			c.NewMissesBlocks,
+			prometheus.CounterValue,
+			metricValue,
+		)
+	}
+	oldStats = stats
 }
 
 func main() {

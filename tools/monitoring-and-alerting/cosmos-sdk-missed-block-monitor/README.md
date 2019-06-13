@@ -14,11 +14,11 @@ go build
 
 ## Install
 
-Update the `stargazer_exporter.service` file's `--block-address` replacing `<change to your hash address>` with your hash address.
+**[Important]** Update the `stargazer_exporter.service` file's `--block-address` replacing `<change to your hash address>` with your hash address.
 
 ```
 sudo chown prometheus:prometheus /usr/local/bin/stargazer_exporter
-sudo chmot 755 /usr/local/bin/stargazer_exporter
+sudo chmod 755 /usr/local/bin/stargazer_exporter
 
 sudo cp stargazer_exporter.service /etc/systemd/system/stargazer_exporter.service
 sudo systemctl daemon-reload
