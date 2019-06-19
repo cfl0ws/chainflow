@@ -8,7 +8,10 @@ User=prometheus
 Group=prometheus
 Type=simple
 ExecStart=/usr/local/bin/stargazer_exporter \
-  --block-address=<change to your hash address> 
+  --block-address=<change to your hash address> \
+  --chat-id <chat id of the Telegram group> \
+  --bot-token <Telegram bot token>
+
 Restart=on-failure
 RestartSec=20s
 

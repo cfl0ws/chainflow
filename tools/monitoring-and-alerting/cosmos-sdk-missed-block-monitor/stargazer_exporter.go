@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
-	"reflect"
 	"strconv"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -14,11 +17,14 @@ import (
 )
 
 var (
-	_ prometheus.Collector = &collector{}
+	_          prometheus.Collector = &collector{}
+	sendClient                      = &http.Client{Timeout: 10 * time.Second}
 
 	oldStats     []stargazer.MissesBlock
 	blockAddress = kingpin.Flag("block-address", "Hash address of the block that needs to monitor").Required().String()
-	bindPort     = kingpin.Flag("bind-port", "Port which listens for promethius to scrape").Default(":9119").String()
+	bindPort     = kingpin.Flag("bind-port", "Port which listens for prometheus to scrape").Default(":9119").String()
+	chatID       = kingpin.Flag("chat-id", "Telegram chat group id").Required().String()
+	token        = kingpin.Flag("bot-token", "Telegram bot secret token").Required().String()
 )
 
 type collector struct {
@@ -38,7 +44,7 @@ func newCollector(stats func() ([]stargazer.MissesBlock, error)) prometheus.Coll
 		NewMissesBlocks: prometheus.NewDesc(
 			"new_missed_blocks",
 			"If there are new missed blocks this will return true, compaired to previous scrape",
-			nil,
+			[]string{"FirstBlock", "LastBlock"},
 			nil,
 		),
 
@@ -79,18 +85,71 @@ func (c *collector) Collect(ch chan<- prometheus.Metric) {
 	}
 
 	if oldStats != nil {
-		metricValue := 1.0
-		if reflect.DeepEqual(oldStats, stats) {
-			metricValue = 0.0
-		}
+		for _, s := range getChanges(oldStats, stats) {
+			FirstBlock := s.StartHeight
+			LastBlock := s.EndHeight
+			count, _ := strconv.Atoi(s.Count)
 
-		ch <- prometheus.MustNewConstMetric(
-			c.NewMissesBlocks,
-			prometheus.CounterValue,
-			metricValue,
-		)
+			ch <- prometheus.MustNewConstMetric(
+				c.NewMissesBlocks,
+				prometheus.CounterValue,
+				float64(count),
+				FirstBlock,
+				LastBlock,
+			)
+		}
 	}
+
 	oldStats = stats
+}
+
+func getChanges(oldStats, newStats []stargazer.MissesBlock) []stargazer.MissesBlock {
+	k := 0
+	for ; oldStats[0].StartHeight != newStats[k].StartHeight; k++ {
+
+	}
+	if k != 0 {
+		sendMessage(newStats[:k], false)
+	}
+	return newStats[:k]
+}
+
+func sendMessage(msg []stargazer.MissesBlock, alert bool) bool {
+
+	url := "https://api.telegram.org/bot" + *token + "/sendMessage"
+
+	msgBuff := "New missed block detected.\n"
+	for _, block := range msg {
+		msgBuff += fmt.Sprintf("First block: %s, Last block: %s, count %s\n", block.StartHeight, block.EndHeight, block.Count)
+	}
+
+	body := map[string]interface{}{
+		"chat_id":              chatID,
+		"text":                 msgBuff,
+		"disable_notification": alert,
+	}
+
+	bytesRepresentation, err := json.Marshal(body)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(bytesRepresentation))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, er := sendClient.Do(req)
+	if er != nil {
+		log.Fatal("Error in request send")
+		return false
+	}
+
+	if err != nil {
+		log.Fatal("Error in request create")
+		return false
+	}
+	defer resp.Body.Close()
+
+	return true
 }
 
 func main() {

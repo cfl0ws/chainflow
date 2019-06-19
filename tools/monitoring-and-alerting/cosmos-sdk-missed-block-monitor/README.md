@@ -9,7 +9,7 @@ In order to run this you need to have the hash address.
 ```
 go get github.com/thilinapiy/stargazer_exporter
 cd $GOPATH/src/github.com/thilinapiy/stargazer_exporter
-go build
+GOOS=linux GOARCH=amd64 go build -v .
 ```
 
 ## Install
