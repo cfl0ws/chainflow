@@ -118,14 +118,23 @@ func sendMessage(msg []stargazer.MissesBlock, alert bool) bool {
 
 	url := "https://api.telegram.org/bot" + *token + "/sendMessage"
 
-	msgBuff := "New missed block detected.\n"
+	message := ""
+	critical := 0
+	msgBuff := "The Chainflow Validator missed\n"
 	for _, block := range msg {
-		msgBuff += fmt.Sprintf("First block: %s, Last block: %s, count %s\n", block.StartHeight, block.EndHeight, block.Count)
+		msgBuff += fmt.Sprintf("%s blocks between block numbers %s-%s\n", block.Count, block.StartHeight, block.EndHeight)
+		intCount, _ := strconv.Atoi(block.Count)
+		critical += intCount
+	}
+	msgBuff += fmt.Sprintf("at %s", time.Now().UTC())
+
+	if critical > 24 {
+		message = "⚠️" + " Critical Alert!\n" + msgBuff
 	}
 
 	body := map[string]interface{}{
 		"chat_id":              chatID,
-		"text":                 msgBuff,
+		"text":                 message,
 		"disable_notification": alert,
 	}
 
