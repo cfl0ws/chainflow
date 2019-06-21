@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -132,32 +133,33 @@ func sendMessage(msg []stargazer.MissesBlock, alert bool) bool {
 		message = "⚠️" + " Critical Alert!\n" + msgBuff
 	}
 
-	body := map[string]interface{}{
-		"chat_id":              chatID,
-		"text":                 message,
-		"disable_notification": alert,
+	for _, chat := range strings.Split(*chatID, ",") {
+		body := map[string]interface{}{
+			"chat_id":              chat,
+			"text":                 message,
+			"disable_notification": alert,
+		}
+
+		bytesRepresentation, err := json.Marshal(body)
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		req, err := http.NewRequest("POST", url, bytes.NewBuffer(bytesRepresentation))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, er := sendClient.Do(req)
+		if er != nil {
+			log.Fatal("Error in request send")
+			return false
+		}
+
+		if err != nil {
+			log.Fatal("Error in request create")
+			return false
+		}
+		defer resp.Body.Close()
 	}
-
-	bytesRepresentation, err := json.Marshal(body)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(bytesRepresentation))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, er := sendClient.Do(req)
-	if er != nil {
-		log.Fatal("Error in request send")
-		return false
-	}
-
-	if err != nil {
-		log.Fatal("Error in request create")
-		return false
-	}
-	defer resp.Body.Close()
-
 	return true
 }
 

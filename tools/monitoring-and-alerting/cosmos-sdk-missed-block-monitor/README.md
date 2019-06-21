@@ -14,7 +14,25 @@ GOOS=linux GOARCH=amd64 go build -v .
 
 ## Install
 
-**[Important]** Update the `stargazer_exporter.service` file's `--block-address` replacing `<change to your hash address>` with your hash address.
+**[Important]** Update the `stargazer_exporter.service` file with following details.
+
+```
+ExecStart=/usr/local/bin/stargazer_exporter \
+  --block-address=<change to your hash address> \
+  --chat-id <chat id of the Telegram group> \
+  --bot-token <Telegram bot token>
+```
+
+*eg:-*
+
+```
+ExecStart=/usr/local/bin/stargazer_exporter \
+  --block-address=1QAZ2WSX3EDC4RFV5TGB6YHN7UJM8IK9OL0P \
+  --chat-id=-group-chat-id,user-id\
+  --bot-token=bot12345678:1qaz2wsx3edc4rfv
+```
+
+Then place the binary in the correct place with correct permissions.
 
 ```
 sudo chown prometheus:prometheus /usr/local/bin/stargazer_exporter
