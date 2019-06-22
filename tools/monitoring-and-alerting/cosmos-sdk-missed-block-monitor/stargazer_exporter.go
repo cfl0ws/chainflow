@@ -130,8 +130,9 @@ func sendMessage(msg []stargazer.MissesBlock, alert bool) bool {
 	msgBuff += fmt.Sprintf("at %s", time.Now().UTC())
 
 	if critical > 24 {
-		message = "⚠️" + " Critical Alert!\n" + msgBuff
+		message = " ⚠️  " + " Critical Alert!\n"
 	}
+	message += msgBuff
 
 	for _, chat := range strings.Split(*chatID, ",") {
 		body := map[string]interface{}{
@@ -158,6 +159,7 @@ func sendMessage(msg []stargazer.MissesBlock, alert bool) bool {
 			log.Fatal("Error in request create")
 			return false
 		}
+		fmt.Printf("Send message: %s, to chat_id: %s.\n", message, chat)
 		defer resp.Body.Close()
 	}
 	return true
