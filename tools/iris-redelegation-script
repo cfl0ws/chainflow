@@ -1,0 +1,175 @@
+#!/bin/bash -e
+# Adapated by https://chainflow.io from https://validator.network Cosmos Script
+# https://github.com/validator-network/cosmoshub-scripts/blob/master/README.md#installation
+
+# This script comes without warranties of any kind. Use at your own risk.
+
+# The purpose of this script is to withdraw rewards (if any) and delegate them to an appointed validator. This way you can reinvest (compound) rewards.
+
+# Requirements: iriscli, curl and jq must be in the path.
+
+
+##############################################################################################################################################################
+# User settings.
+##############################################################################################################################################################
+
+KEY=" "                                  # This is the key you wish to use for signing transactions, listed in first column of "iriscli keys list".
+PASSPHRASE=" "                           # Only populate if you want to run the script periodically. This is UNSAFE and should only be done if you know what you are doing.
+DENOM="iris-atto"                           # Coin denominator is iris-atto 
+MINIMUM_DELEGATION_AMOUNT="1"    # Only perform delegations above this amount of uatom. Default: 1iris.
+RESERVATION_AMOUNT="1"          # Keep this amount of Iris in account. Default: 1iris.
+VALIDATOR=" "        # Default is Validator Network. Thank you for your patronage :-)
+
+##############################################################################################################################################################
+
+
+##############################################################################################################################################################
+# Sensible defaults.
+##############################################################################################################################################################
+
+CHAIN_ID="nyancat-3"                                     # Current chain id. Empty means auto-detect.
+NODE="tcp://localhost:26657"  # Either run a local full node or choose one you trust.
+GAS_PRICES="0.025uatom"                         # Gas prices to pay for transaction.
+GAS_ADJUSTMENT="1.30"                           # Adjustment for estimated gas
+#GAS_FLAGS="--gas auto --gas-prices ${GAS_PRICES} --gas-adjustment ${GAS_ADJUSTMENT}"
+GAS_FLAGS="--gas-adjustment ${GAS_ADJUSTMENT}"
+
+##############################################################################################################################################################
+
+
+# Auto-detect chain-id if not specified.
+#if [ -z "${CHAIN_ID}" ]
+#then
+#  NODE_STATUS=$(curl -s --max-time 5 ${NODE}/status)
+#  CHAIN_ID=$(echo ${NODE_STATUS} | jq -r ".result.node_info.network")
+#fi
+
+# Use first command line argument in case KEY is not defined.
+if [ -z "${KEY}" ] && [ ! -z "${1}" ]
+then
+  KEY=${1}
+fi
+
+# Get information about key
+KEY_STATUS=$(iriscli keys show ${KEY} --output json)
+KEY_TYPE=$(echo ${KEY_STATUS} | jq -r ".type")
+if [ "${KEY_TYPE}" == "ledger" ]
+then
+    SIGNING_FLAGS="--ledger"
+fi
+
+# Get current account balance.
+ACCOUNT_ADDRESS=$(echo ${KEY_STATUS} | jq -r ".address")
+ACCOUNT_STATUS=$(iriscli bank account ${ACCOUNT_ADDRESS} --chain-id ${CHAIN_ID} --node ${NODE} --output json)
+ACCOUNT_SEQUENCE=$(echo ${ACCOUNT_STATUS} | jq -r ".value.sequence")
+ACCOUNT_BALANCE=$(echo $(echo ${ACCOUNT_STATUS} | jq -r ".value.coins[] | select(.denom == \"${DENOM}\") | .amount")/10^18 | bc || true)
+if [ -z "${ACCOUNT_BALANCE}" ]
+then
+    # Empty response means zero balance.
+    ACCOUNT_BALANCE=0
+fi
+
+# Get available rewards.
+REWARDS_STATUS=$(iriscli distribution rewards ${ACCOUNT_ADDRESS} --chain-id ${CHAIN_ID} --node ${NODE} --output json)
+if [ "${REWARDS_STATUS}" == "null" ]
+then
+    # Empty response means zero balance.
+    REWARDS_BALANCE="0"
+else
+    REWARDS_BALANCE=$(echo $(echo ${REWARDS_STATUS} | jq -r ".total[] | select(.denom == \"${DENOM}\") | .amount")/10^18 | bc || true)
+    if [ -z "${REWARDS_BALANCE}" ] || [ "${REWARDS_BALANCE}" == "null" ]
+    then
+        # Empty response means zero balance.
+        REWARDS_BALANCE="0"
+    else
+        # Remove decimals.
+        REWARDS_BALANCE=${REWARDS_BALANCE%.*}
+    fi
+fi
+
+# Get available commission.
+VALIDATOR_ADDRESS=$(iriscli keys show ${KEY} --bech val --address)
+COMMISSION_STATUS=$(iriscli distribution rewards ${ACCOUNT_ADDRESS} --chain-id ${CHAIN_ID} --node ${NODE} --output json)
+if [ "${COMMISSION_STATUS}" == "null" ]
+then
+    # Empty response means zero balance.
+    COMMISSION_BALANCE="0"
+else
+    COMMISSION_BALANCE=$(echo $(echo ${COMMISSION_STATUS} | jq -r ".commission[] | select(.denom == \"${DENOM}\") | .amount")/10^18| bc || true)
+    if [ -z "${COMMISSION_BALANCE}" ]
+    then
+        # Empty response means zero balance.
+        COMMISSION_BALANCE="0"
+    else
+        # Remove decimals.
+        COMMISSION_BALANCE=${COMMISSION_BALANCE%.*}
+    fi
+fi
+
+# Calculate net balance and amount to delegate.
+#NET_BALANCE=$((${ACCOUNT_BALANCE} + ${REWARDS_BALANCE} + ${COMMISSION_BALANCE}))
+NET_BALANCE=$(echo ${ACCOUNT_BALANCE} + ${REWARDS_BALANCE} + ${COMMISSION_BALANCE}|bc)
+if [ "${NET_BALANCE}" -gt "$(echo ${MINIMUM_DELEGATION_AMOUNT} + ${RESERVATION_AMOUNT}|bc)" ]
+then
+    DELEGATION_AMOUNT=$(echo ${NET_BALANCE} - ${RESERVATION_AMOUNT}|bc)
+else
+    DELEGATION_AMOUNT="0"
+fi
+
+# Display what we know so far.
+echo "======================================================"
+echo "Account: ${KEY} (${KEY_TYPE})"
+echo "Address: ${ACCOUNT_ADDRESS}"
+echo "======================================================"
+echo "Account balance:      ${ACCOUNT_BALANCE} ${DENOM}"
+echo "Available rewards:    ${REWARDS_BALANCE} ${DENOM}"
+echo "Available commission: ${COMMISSION_BALANCE} ${DENOM}"
+echo "Net balance:          ${NET_BALANCE} ${DENOM}"
+echo "Reservation:          ${RESERVATION_AMOUNT} ${DENOM}"
+echo "Min delegation:       ${MINIMUM_DELEGATION_AMOUNT} ${DENOM}"
+echo "Delegation:           ${DELEGATION_AMOUNT} ${DENOM}"
+echo
+
+if [ "${DELEGATION_AMOUNT}" -eq 0 ]
+then
+    echo "Nothing to delegate."
+    exit 0
+fi
+
+# Display delegation information.
+VALIDATOR_STATUS=$(iriscli stake validator ${VALIDATOR} --chain-id ${CHAIN_ID} --node ${NODE} --output json)
+VALIDATOR_MONIKER=$(echo ${VALIDATOR_STATUS} | jq -r ".description.moniker")
+VALIDATOR_DETAILS=$(echo ${VALIDATOR_STATUS} | jq -r ".description.details")
+echo "You are about to delegate ${DELEGATION_AMOUNT}${DENOM} to ${VALIDATOR}:"
+echo "  Moniker: ${VALIDATOR_MONIKER}"
+echo "  Details: ${VALIDATOR_DETAILS}"
+echo
+
+# Ask for passphrase to sign transactions.
+if [ -z "${SIGNING_FLAGS}" ] && [ -z "${PASSPHRASE}" ]
+then
+    read -s -p "Enter passphrase required to sign for \"${KEY}\": " PASSPHRASE
+    echo ""
+fi
+
+# Run transactions
+MEMO=$'Reinvesting rewards @ Validator\xF0\x9F\x8C\x90Network'
+if [ "${REWARDS_BALANCE}" -gt 0 ]
+then
+    printf "Withdrawing rewards... "
+    echo ${PASSPHRASE} | iriscli distribution withdraw-rewards --is-validator --from ${KEY} --sequence ${ACCOUNT_SEQUENCE} --chain-id ${CHAIN_ID} --node ${NODE} ${GAS_FLAGS} ${SIGNING_FLAGS} --async
+    ACCOUNT_SEQUENCE=$((ACCOUNT_SEQUENCE + 1))
+fi
+
+#if [ "${COMMISSION_BALANCE}" -gt 0 ]
+#then
+#    printf "Withdrawing commission... "
+#    echo ${PASSPHRASE} | iriscli distribution withdraw-rewards ${VALIDATOR_ADDRESS} --commission --yes --from ${KEY} --sequence ${ACCOUNT_SEQUENCE} --chain-id ${CHAIN_ID} --node ${NODE} ${GAS_FLAGS} ${SIGNING_FLAGS} --async
+#    ACCOUNT_SEQUENCE=$((ACCOUNT_SEQUENCE + 1))
+#fi
+
+printf "Delegating... "
+echo ${PASSPHRASE} | iriscli stake delegate --address-validator ${VALIDATOR} --amount ${DELEGATION_AMOUNT}${DENOM} --from ${KEY} --sequence ${ACCOUNT_SEQUENCE} --chain-id ${CHAIN_ID} --node ${NODE} ${GAS_FLAGS} ${SIGNING_FLAGS} --async
+
+echo
+echo "Have an Iris day!"
