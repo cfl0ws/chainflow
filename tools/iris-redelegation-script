@@ -32,7 +32,7 @@ NODE="tcp://localhost:26657"  # Either run a local full node or choose one you t
 GAS_PRICES="0.025uatom"                         # Gas prices to pay for transaction.
 GAS_ADJUSTMENT="1.30"                           # Adjustment for estimated gas
 #GAS_FLAGS="--gas auto --gas-prices ${GAS_PRICES} --gas-adjustment ${GAS_ADJUSTMENT}"
-GAS_FLAGS="--gas-adjustment ${GAS_ADJUSTMENT}"
+GAS_FLAGS="--fee=0.6iris --gas=100000"
 
 ##############################################################################################################################################################
 
