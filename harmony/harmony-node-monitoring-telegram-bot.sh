@@ -1,7 +1,13 @@
-# This script queries https://harmony.one/balances.json and https://harmony.one/1h.json for a Harmony Node and sends the output to a Telegram chat.
-# Provided without warranty by https://chainflow.io/staking. Use at your own risk and may it be of benefit to you and the Harmony network.
-
-# Replace [YOUR TELEGRAM BOT TOKEN], [YOUR TELEGRAM CHAT ID] and [YOUR HARMONY NODE ADDRESS] with your information. Then install this scrip as a cron job to run at your preferred interval.
+# This script queries https://harmony.one/balances.json and https://harmony.one/1h.json for a Harmony Node.
+# It sends the output to a Telegram chat.
+#
+# Provided without warranty by https://chainflow.io/staking. Use at your own risk and may it be of benefit 
+# to you and the Harmony network.
+#
+# Instructions -
+#
+# Replace [YOUR TELEGRAM BOT TOKEN], [YOUR TELEGRAM CHAT ID] and [YOUR HARMONY NODE ADDRESS] with your information.
+# Then install this script as a cron job to run at your preferred interval.
 
 #!/bin/bash
 
