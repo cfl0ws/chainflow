@@ -3,9 +3,9 @@
 TOKEN=[YOUR BOT TOKEN]
 CHAT_ID=-[YOUR CHAT ID]
 URL="https://api.telegram.org/bot$TOKEN/sendMessage"
-MESSAGE="Solana validator not available"
+MESSAGE="Solana Validator NOT Voting"
 
-solana show-validators | grep 8bRCnytB7bySmqxodNGbZuUAtncKkB8T733DD1Dm9WMb
+solana show-validators | grep [YOUR VALIDATOR VOTE IDENTITY OR VOTE ACCOUNT PUBKEY]
 RESULT=$?
 
 echo -e "Grep identified as: $RESULT"
