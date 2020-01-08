@@ -7,7 +7,7 @@ CHAT_ID=-[YOUR TELEGRAM CHAT ID]
 URL="https://api.telegram.org/bot$TOKEN/sendMessage"
 MESSAGE="Solana Validator NOT Voting"
 
-solana show-validators | grep [YOUR VALIDATOR VOTE ACCOUNT PUBKEY]
+[YOUR PATH TO]/solana show-validators | grep [YOUR VALIDATOR VOTE ACCOUNT PUBKEY]
 RESULT=$?
 
 echo -e "Grep identified as: $RESULT"
