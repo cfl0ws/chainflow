@@ -2,8 +2,8 @@
 
 #!/bin/bash
 
-TOKEN=[YOUR BOT TOKEN]
-CHAT_ID=-[YOUR CHAT ID]
+TOKEN=[YOUR TELEGRAM BOT TOKEN]
+CHAT_ID=-[YOUR TELEGRAM CHAT ID]
 URL="https://api.telegram.org/bot$TOKEN/sendMessage"
 MESSAGE="Solana Validator NOT Voting"
 
